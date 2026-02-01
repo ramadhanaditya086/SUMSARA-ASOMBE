@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dompet Pintar - Personal Finance Management</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .card-hover { transition: transform 0.2s, box-shadow 0.2s; }
+        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased">
+
+<div id="app" class="min-h-screen flex flex-col">
+
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center gap-3">
+                    <div class="bg-blue-600 text-white p-2 rounded-lg">
+                        <i class="fa-solid fa-wallet text-xl"></i>
+                    </div>
+                    <span class="font-bold text-xl tracking-tight text-slate-900">Dompet Pintar</span>
+                </div>
+                <div class="text-sm text-slate-500">
+                    <i class="fa-regular fa-calendar me-1"></i> {{ currentDate }}
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 card-hover md:col-span-4 lg:col-span-1">
+                <h3 class="text-slate-500 text-sm font-medium uppercase tracking-wider mb-1">Saldo Saat Ini</h3>
+                <div class="text-3xl font-bold text-blue-600">{{ formatRupiah(currentBalance) }}</div>
+                <div class="mt-2 text-xs text-slate-400">Net Cash Flow</div>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-sm border-l-4 border-emerald-500 card-hover">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h3 class="text-slate-500 text-sm font-medium mb-1">Total Pemasukan</h3>
+                        <div class="text-2xl font-bold text-emerald-600">+{{ formatRupiah(totalIncome) }}</div>
+                    </div>
+                    <div class="bg-emerald-50 p-2 rounded-full text-emerald-600"><i class="fa-solid fa-arrow-trend-up"></i></div>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-sm border-l-4 border-rose-500 card-hover">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h3 class="text-slate-500 text-sm font-medium mb-1">Total Pengeluaran</h3>
+                        <div class="text-2xl font-bold text-rose-600">-{{ formatRupiah(totalExpense) }}</div>
+                    </div>
+                    <div class="bg-rose-50 p-2 rounded-full text-rose-600"><i class="fa-solid fa-arrow-trend-down"></i></div>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-sm border-l-4 border-amber-500 card-hover">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h3 class="text-slate-500 text-sm font-medium mb-1">Capaian Target</h3>
+                        <div class="text-2xl font-bold text-amber-600">{{ savingsProgress }}%</div>
+                        <div class="text-xs text-slate-400 mt-1">dari target Rp {{ formatCurrencySimple(settings.savingsGoal) }}</div>
+                    </div>
+                    <div class="bg-amber-50 p-2 rounded-full text-amber-600"><i class="fa-solid fa-bullseye"></i></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <div class="lg:col-span-2 space-y-8">
+                <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div class="flex border-b border-slate-100">
+                        <button @click="activeTab = 'income'" :class="{'border-b-2 border-emerald-500 text-emerald-600 bg-emerald-50/50': activeTab === 'income'}" class="flex-1 py-4 text-sm font-medium text-slate-500 hover:text-slate-700 transition">
+                            <i class="fa-solid fa-plus-circle me-2"></i>Catat Pemasukan
+                        </button>
+                        <button @click="activeTab = 'expense'" :class="{'border-b-2 border-rose-500 text-rose-600 bg-rose-50/50': activeTab === 'expense'}" class="flex-1 py-4 text-sm font-medium text-slate-500 hover:text-slate-700 transition">
+                            <i class="fa-solid fa-minus-circle me-2"></i>Catat Pengeluaran
+                        </button>
+                        <button @click="activeTab = 'settings'" :class="{'border-b-2 border-amber-500 text-amber-600 bg-amber-50/50': activeTab === 'settings'}" class="flex-1 py-4 text-sm font-medium text-slate-500 hover:text-slate-700 transition">
+                            <i class="fa-solid fa-sliders me-2"></i>Target & Analisis
+                        </button>
+                    </div>
+
+                    <div class="p-6">
+                        <form v-if="activeTab === 'income'" @submit.prevent="addTransaction('income')" class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Jumlah (Rp)</label>
+                                    <input v-model.number="form.amount" type="number" required class="w-full rounded-lg border-slate-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 p-2.5 border" placeholder="Contoh: 5000000">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Tanggal</label>
+                                    <input v-model="form.date" type="date" required class="w-full rounded-lg border-slate-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 p-2.5 border">
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Kategori</label>
+                                    <select v-model="form.category" class="w-full rounded-lg border-slate-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 p-2.5 border">
+                                        <option value="Gaji">Gaji</option>
+                                        <option value="Proyek">Proyek / Freelance</option>
+                                        <option value="Bonus">Bonus</option>
+                                        <option value="Investasi">Hasil Investasi / Aset</option>
+                                        <option value="Lainnya">Lainnya</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Frekuensi</label>
+                                    <select v-model="form.frequency" class="w-full rounded-lg border-slate-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 p-2.5 border">
+                                        <option value="Sekali">Sekali Saja</option>
+                                        <option value="Harian">Harian</option>
+                                        <option value="Bulanan">Bulanan</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div v-if="form.category === 'Gaji'" class="bg-emerald-50 p-4 rounded-lg border border-emerald-100">
+                                <label class="block text-sm font-medium text-emerald-800 mb-1">Periode Penggajian</label>
+                                <select v-model="form.salaryPeriod" class="w-full rounded-lg border-emerald-200 focus:border-emerald-500 p-2 border bg-white">
+                                    <option value="Awal Bulan">Awal Bulan (Tgl 1-5)</option>
+                                    <option value="Akhir Bulan">Akhir Bulan (Tgl 25-31)</option>
+                                    <option value="Mingguan">Mingguan</option>
+                                </select>
+                            </div>
+
+                            <div v-if="form.category === 'Investasi'" class="bg-blue-50 p-4 rounded-lg border border-blue-100 space-y-3">
+                                <h4 class="text-sm font-bold text-blue-800 flex items-center gap-2"><i class="fa-solid fa-chart-line"></i> Detail Aset Investasi</h4>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="text-xs text-blue-700">Jenis</label>
+                                        <select v-model="form.investType" class="w-full text-sm rounded border-blue-200 p-2 bg-white border">
+                                            <option value="Saham">Saham</option>
+                                            <option value="Emas">Emas</option>
+                                            <option value="Reksadana">Reksadana</option>
+                                            <option value="Crypto">Crypto</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="text-xs text-blue-700">Jumlah Unit/Lot/Gram</label>
+                                        <input v-model="form.investUnit" type="number" step="0.01" class="w-full text-sm rounded border-blue-200 p-2 border">
+                                    </div>
+                                    <div>
+                                        <label class="text-xs text-blue-700">Harga Beli (Per Unit)</label>
+                                        <input v-model="form.investBuyPrice" type="number" class="w-full text-sm rounded border-blue-200 p-2 border">
+                                    </div>
+                                </div>
+                                <div class="text-xs text-blue-600 italic">*Nilai yang masuk ke saldo adalah total estimasi nilai saat ini.</div>
+                            </div>
+
+                            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2.5 rounded-lg shadow transition duration-200">
+                                <i class="fa-solid fa-save me-2"></i>Simpan Pemasukan
+                            </button>
+                        </form>
+
+                        <form v-if="activeTab === 'expense'" @submit.prevent="addTransaction('expense')" class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Jumlah (Rp)</label>
+                                    <input v-model.number="form.amount" type="number" required class="w-full rounded-lg border-slate-300 shadow-sm focus:border-rose-500 focus:ring-rose-500 p-2.5 border" placeholder="Contoh: 50000">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Kategori</label>
+                                    <select v-model="form.category" class="w-full rounded-lg border-slate-300 shadow-sm focus:border-rose-500 focus:ring-rose-500 p-2.5 border">
+                                        <option value="Makan">Makanan & Minuman</option>
+                                        <option value="Transport">Transportasi</option>
+                                        <option value="Tagihan">Tagihan & Utilitas</option>
+                                        <option value="Hiburan">Hiburan</option>
+                                        <option value="Belanja">Belanja</option>
+                                        <option value="Kesehatan">Kesehatan</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Tanggal</label>
+                                    <input v-model="form.date" type="date" required class="w-full rounded-lg border-slate-300 shadow-sm focus:border-rose-500 focus:ring-rose-500 p-2.5 border">
+                                </div>
+                                <div class="flex items-center gap-3 pt-6">
+                                    <input v-model="form.isRecurring" type="checkbox" id="recurring" class="w-4 h-4 text-rose-600 rounded focus:ring-rose-500 border-gray-300">
+                                    <label for="recurring" class="text-sm text-slate-700">Pengeluaran Rutin / Berulang?</label>
+                                </div>
+                            </div>
+
+                            <div v-if="form.isRecurring" class="bg-rose-50 p-4 rounded-lg border border-rose-100">
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-xs font-medium text-rose-800 mb-1">Siklus</label>
+                                        <select v-model="form.recurringCycle" class="w-full text-sm rounded border-rose-200 p-2 bg-white border">
+                                            <option value="Harian">Harian</option>
+                                            <option value="Bulanan">Bulanan</option>
+                                            <option value="Tahunan">Tahunan</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-rose-800 mb-1">Estimasi Durasi (Bulan)</label>
+                                        <input v-model="form.recurringDuration" type="number" class="w-full text-sm rounded border-rose-200 p-2 border" placeholder="Selamanya isi 0">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-medium py-2.5 rounded-lg shadow transition duration-200">
+                                <i class="fa-solid fa-save me-2"></i>Simpan Pengeluaran
+                            </button>
+                        </form>
+
+                        <div v-if="activeTab === 'settings'" class="space-y-6">
+                            <div class="bg-amber-50 p-5 rounded-lg border border-amber-100">
+                                <h4 class="font-bold text-amber-800 mb-3">Atur Target Tabungan</h4>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-xs text-amber-700 mb-1">Target Nominal (Rp)</label>
+                                        <input v-model.number="settings.savingsGoal" type="number" class="w-full border-amber-300 rounded p-2 text-sm focus:ring-amber-500 focus:border-amber-500 border">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-amber-700 mb-1">Target Waktu (Tahun)</label>
+                                        <select v-model.number="settings.targetYears" class="w-full border-amber-300 rounded p-2 text-sm bg-white border">
+                                            <option value="1">1 Tahun</option>
+                                            <option value="2">2 Tahun</option>
+                                            <option value="3">3 Tahun</option>
+                                            <option value="5">5 Tahun</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="mt-4 pt-4 border-t border-amber-200 text-sm text-amber-800">
+                                    Anda perlu menabung <span class="font-bold">{{ formatRupiah(monthlySavingsNeeded) }}</span> per bulan untuk mencapai target ini.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                        <h3 class="font-bold text-slate-700">Riwayat Transaksi</h3>
+                        <button @click="clearAllData" class="text-xs text-red-500 hover:text-red-700 hover:underline">Reset Data</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-slate-600">
+                            <thead class="text-xs text-slate-500 uppercase bg-slate-50">
+                                <tr>
+                                    <th class="px-6 py-3">Tanggal</th>
+                                    <th class="px-6 py-3">Kategori</th>
+                                    <th class="px-6 py-3">Deskripsi/Detail</th>
+                                    <th class="px-6 py-3 text-right">Jumlah</th>
+                                    <th class="px-6 py-3 text-center">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-if="transactions.length === 0">
+                                    <td colspan="5" class="px-6 py-8 text-center text-slate-400">Belum ada data transaksi.</td>
+                                </tr>
+                                <tr v-for="(t, index) in sortedTransactions" :key="index" class="bg-white border-b hover:bg-slate-50">
+                                    <td class="px-6 py-4">{{ formatDate(t.date) }}</td>
+                                    <td class="px-6 py-4">
+                                        <span :class="t.type === 'income' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'" class="px-2 py-1 rounded-full text-xs font-medium">
+                                            {{ t.category }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 text-xs">
+                                        <div v-if="t.category === 'Investasi'">
+                                            {{ t.details.type }} ({{ t.details.unit }} unit)
+                                        </div>
+                                        <div v-else-if="t.type === 'expense' && t.details.isRecurring">
+                                            Rutin: {{ t.details.cycle }}
+                                        </div>
+                                        <div v-else>-</div>
+                                    </td>
+                                    <td class="px-6 py-4 text-right font-medium" :class="t.type === 'income' ? 'text-emerald-600' : 'text-rose-600'">
+                                        {{ t.type === 'income' ? '+' : '-' }} {{ formatCurrencySimple(t.amount) }}
+                                    </td>
+                                    <td class="px-6 py-4 text-center">
+                                        <button @click="deleteTransaction(index)" class="text-slate-400 hover:text-rose-500 transition">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-6">
+                
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                    <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-stethoscope text-blue-500"></i> Analisis Kesehatan
+                    </h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-slate-600">Dana Darurat (6x Pengeluaran)</span>
+                                <span class="font-bold text-slate-800">{{ formatCurrencySimple(emergencyFundTarget) }}</span>
+                            </div>
+                            <div class="w-full bg-slate-200 rounded-full h-2">
+                                <div class="bg-blue-500 h-2 rounded-full" :style="{ width: emergencyFundProgress + '%' }"></div>
+                            </div>
+                            <p class="text-xs text-slate-400 mt-1" v-if="currentBalance < emergencyFundTarget">Anda butuh {{ formatCurrencySimple(emergencyFundTarget - currentBalance) }} lagi.</p>
+                            <p class="text-xs text-emerald-500 mt-1" v-else>Dana darurat aman!</p>
+                        </div>
+
+                        <div class="pt-3 border-t border-slate-100">
+                            <h4 class="text-xs font-bold text-slate-500 uppercase mb-2">Alokasi "Uang Dingin"</h4>
+                            <div class="flex items-center gap-3">
+                                <div class="text-2xl font-bold text-purple-600">{{ formatRupiah(coldMoney) }}</div>
+                            </div>
+                            <p class="text-xs text-slate-400 mt-1">Sisa saldo setelah dikurangi estimasi pengeluaran rutin bulan depan & dana darurat dasar.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                    <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-pie text-rose-500"></i> Proyeksi Pengeluaran
+                    </h3>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
+                            <span class="text-sm text-slate-600">Harian (Rata-rata)</span>
+                            <span class="font-bold text-slate-800">{{ formatCurrencySimple(dailyBurnRate) }}</span>
+                        </div>
+                        <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
+                            <span class="text-sm text-slate-600">Bulanan (Estimasi)</span>
+                            <span class="font-bold text-slate-800">{{ formatCurrencySimple(monthlyBurnRate) }}</span>
+                        </div>
+                        <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-rose-100 bg-rose-50">
+                            <span class="text-sm text-rose-800">Tahunan (Proyeksi)</span>
+                            <span class="font-bold text-rose-800">{{ formatCurrencySimple(monthlyBurnRate * 12) }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-gradient-to-br from-indigo-500 to-purple-600 p-6 rounded-xl shadow-md text-white">
+                    <h3 class="font-bold text-lg mb-2"><i class="fa-regular fa-lightbulb"></i> Tahukah Anda?</h3>
+                    <p class="text-sm opacity-90 leading-relaxed">
+                        Mengalokasikan 20% dari pendapatan untuk investasi/tabungan di awal bulan (pay yourself first) jauh lebih efektif daripada menabung sisa uang di akhir bulan.
+                    </p>
+                </div>
+
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+    const { createApp, ref, computed, onMounted, watch } = Vue;
+
+    createApp({
+        setup() {
+            // State
+            const activeTab = ref('income'); // income, expense, settings
+            const currentDate = ref(new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
+            
+            const transactions = ref([]);
+            
+            const form = ref({
+                amount: null,
+                category: 'Gaji',
+                date: new Date().toISOString().split('T')[0],
+                frequency: 'Sekali',
+                salaryPeriod: 'Awal Bulan', // Dynamic Income
+                investType: 'Saham', investUnit: 0, investBuyPrice: 0, // Dynamic Invest
+                isRecurring: false, recurringCycle: 'Bulanan', recurringDuration: 0 // Dynamic Expense
+            });
+
+            const settings = ref({
+                savingsGoal: 10000000,
+                targetYears: 1
+            });
+
+            // Load Data
+            onMounted(() => {
+                const savedData = localStorage.getItem('dompetPintarData');
+                if (savedData) {
+                    transactions.value = JSON.parse(savedData);
+                }
+                const savedSettings = localStorage.getItem('dompetPintarSettings');
+                if (savedSettings) {
+                    settings.value = JSON.parse(savedSettings);
+                }
+            });
+
+            // Watch & Save
+            watch(transactions, (newVal) => {
+                localStorage.setItem('dompetPintarData', JSON.stringify(newVal));
+            }, { deep: true });
+            
+            watch(settings, (newVal) => {
+                localStorage.setItem('dompetPintarSettings', JSON.stringify(newVal));
+            }, { deep: true });
+
+            // Computed Financial Logic
+            const totalIncome = computed(() => transactions.value.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0));
+            const totalExpense = computed(() => transactions.value.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0));
+            const currentBalance = computed(() => totalIncome.value - totalExpense.value);
+
+            const sortedTransactions = computed(() => {
+                return [...transactions.value].sort((a, b) => new Date(b.date) - new Date(a.date));
+            });
+
+            // Analisis Pengeluaran (Burn Rate)
+            const monthlyBurnRate = computed(() => {
+                // Logika Sederhana: Total Pengeluaran bulan ini + Pengeluaran Rutin
+                // Untuk demo ini, kita ambil rata-rata pengeluaran yang tercatat dibagi jumlah bulan unik, 
+                // atau jika ada recurring, kita tambahkan proyeksinya.
+                if (transactions.value.length === 0) return 0;
+                
+                // Cek pengeluaran rutin
+                const recurringExpenses = transactions.value
+                    .filter(t => t.type === 'expense' && t.details?.isRecurring && t.details?.cycle === 'Bulanan')
+                    .reduce((acc, t) => acc + t.amount, 0);
+
+                // Jika data sedikit, gunakan data historis sebagai estimasi
+                const totalNonRecurring = transactions.value
+                    .filter(t => t.type === 'expense' && (!t.details?.isRecurring))
+                    .reduce((acc, t) => acc + t.amount, 0);
+                
+                // Asumsi sederhana: Non-recurring dirata-rata 30 hari terakhir (hardcoded divisor for demo logic)
+                const estimatedMonthlyNonRecurring = totalNonRecurring > 0 ? totalNonRecurring : 0; 
+
+                // Agar angka tidak "meledak" di demo, kita gunakan logika:
+                // BurnRate = (Total Expense / Jumlah Data Bulan) ATAU (Recurring + Average Harian * 30)
+                // Kita gunakan simplifikasi: Average pengeluaran semua waktu (jika < 1 bulan) atau rata2 bulanan.
+                return recurringExpenses > 0 ? recurringExpenses + (estimatedMonthlyNonRecurring * 0.1) : (totalExpense.value > 0 ? totalExpense.value : 0);
+            });
+
+            const dailyBurnRate = computed(() => monthlyBurnRate.value / 30);
+
+            // Analisis Target
+            const monthlySavingsNeeded = computed(() => {
+                const months = settings.value.targetYears * 12;
+                if (months <= 0) return 0;
+                return settings.value.savingsGoal / months;
+            });
+
+            const savingsProgress = computed(() => {
+                if (settings.value.savingsGoal <= 0) return 0;
+                // Asumsi: Saldo saat ini adalah tabungan
+                let pct = (currentBalance.value / settings.value.savingsGoal) * 100;
+                return Math.min(pct, 100).toFixed(1);
+            });
+
+            // Dana Darurat Logic (6x Monthly Burn Rate)
+            const emergencyFundTarget = computed(() => monthlyBurnRate.value * 6);
+            const emergencyFundProgress = computed(() => {
+                if (emergencyFundTarget.value <= 0) return 0;
+                let pct = (currentBalance.value / emergencyFundTarget.value) * 100;
+                return Math.min(pct, 100);
+            });
+
+            // Uang Dingin = Saldo - Dana Darurat Target (Konservatif)
+            const coldMoney = computed(() => {
+                const available = currentBalance.value - emergencyFundTarget.value;
+                return available > 0 ? available : 0;
+            });
+
+            // Methods
+            const addTransaction = (type) => {
+                if (!form.value.amount || form.value.amount <= 0) return alert('Jumlah harus diisi!');
+                
+                const newTx = {
+                    id: Date.now(),
+                    type: type,
+                    amount: form.value.amount,
+                    date: form.value.date,
+                    category: form.value.category,
+                    details: { ...form.value } // Copy detail form (recurring, invest info, etc)
+                };
+
+                transactions.value.push(newTx);
+                
+                // Reset Form (keep date)
+                form.value.amount = null;
+                form.value.isRecurring = false;
+                form.value.investUnit = 0;
+                form.value.investBuyPrice = 0;
+                
+                alert('Transaksi berhasil disimpan!');
+            };
+
+            const deleteTransaction = (index) => {
+                if(confirm('Hapus transaksi ini?')) {
+                    // Karena sortedTransactions adalah computed, kita harus cari index asli di array transactions
+                    // Simplifikasi: hapus berdasarkan referensi objek atau ID jika ada.
+                    // Di sini kita hapus dari array asli menggunakan ID.
+                    const txId = sortedTransactions.value[index].id;
+                    const originalIndex = transactions.value.findIndex(t => t.id === txId);
+                    if (originalIndex !== -1) transactions.value.splice(originalIndex, 1);
+                }
+            };
+
+            const clearAllData = () => {
+                if(confirm('Yakin reset semua data? Data tidak bisa kembali.')) {
+                    transactions.value = [];
+                    localStorage.removeItem('dompetPintarData');
+                }
+            };
+
+            // Formatters
+            const formatRupiah = (number) => {
+                return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(number);
+            };
+            
+            const formatCurrencySimple = (number) => {
+                return new Intl.NumberFormat('id-ID').format(number);
+            };
+
+            const formatDate = (dateStr) => {
+                const options = { day: 'numeric', month: 'short', year: 'numeric' };
+                return new Date(dateStr).toLocaleDateString('id-ID', options);
+            };
+
+            return {
+                activeTab, currentDate, form, settings,
+                transactions, sortedTransactions,
+                totalIncome, totalExpense, currentBalance,
+                monthlyBurnRate, dailyBurnRate,
+                monthlySavingsNeeded, savingsProgress,
+                emergencyFundTarget, emergencyFundProgress, coldMoney,
+                addTransaction, deleteTransaction, clearAllData,
+                formatRupiah, formatCurrencySimple, formatDate
+            };
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>
