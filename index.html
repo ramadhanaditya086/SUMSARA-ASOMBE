@@ -3,23 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dompet Pintar - Final Auto Date</title>
+    <title>Dompet Pintar - Fixed Weekly Logic</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
-        /* Custom Scrollbar */
         .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #f8fafc; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-        
         .card-hover { transition: transform 0.2s, box-shadow 0.2s; }
         .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
         .loading-overlay { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(2px); }
-        
         @keyframes pulse-border {
             0% { border-color: rgba(99, 102, 241, 0.5); }
             50% { border-color: rgba(99, 102, 241, 1); }
@@ -48,7 +45,7 @@
                     </div>
                     <div>
                         <span class="font-bold text-xl tracking-tight text-slate-900 block leading-none">Dompet Pintar</span>
-                        <span class="text-[10px] text-emerald-500 font-medium uppercase tracking-wide">Pro Version</span>
+                        <span class="text-[10px] text-emerald-500 font-medium uppercase tracking-wide">Weekly Fixed</span>
                     </div>
                 </div>
                 <div class="text-sm text-slate-500 hidden sm:block">
@@ -340,7 +337,7 @@
                     </div>
                 </div>
 
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+   <!--            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                     <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
                         <i class="fa-solid fa-chart-pie text-rose-500"></i> Proyeksi Pengeluaran
                     </h3>
@@ -378,7 +375,7 @@
                             </div>
                         </div>
                     </div>
-                </div>
+                </div>-->
 
                 <div class="bg-gradient-to-br from-indigo-600 to-violet-700 p-6 rounded-xl shadow-lg text-white smart-tip-box border-2 border-transparent">
                     <h3 class="font-bold text-lg mb-3 flex items-center gap-2">
@@ -425,14 +422,13 @@
 
   };
 
-
     // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
     createApp({
         setup() {
-            // Helper function to get today's date in 'YYYY-MM-DD' format using local time
+            // HELPER: Get Local Date 'YYYY-MM-DD'
             const getLocalToday = () => {
                 const d = new Date();
                 const year = d.getFullYear();
@@ -441,7 +437,24 @@
                 return `${year}-${month}-${day}`;
             };
 
-            // State
+            // HELPER: Convert String 'YYYY-MM-DD' to Local Date Object (00:00:00)
+            const parseLocal = (dateStr) => {
+                if (!dateStr) return new Date();
+                const [y, m, d] = dateStr.split('-').map(Number);
+                return new Date(y, m - 1, d);
+            };
+
+            // HELPER: Get Monday of the week for a given date
+            const getStartOfWeek = (date) => {
+                const d = new Date(date);
+                // Adjust to 00:00:00 first to avoid DST issues
+                d.setHours(0, 0, 0, 0);
+                const day = d.getDay();
+                // Formula: Monday is 1. If Sunday (0), go back 6 days. Else go back (day - 1) days.
+                const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+                return new Date(d.setDate(diff));
+            };
+
             const activeTab = ref('income'); 
             const currentDate = ref(new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
             const displayAmount = ref('');
@@ -452,7 +465,7 @@
                 itemName: '',
                 amount: null,
                 category: 'Makan',
-                date: getLocalToday(), // Use local date
+                date: getLocalToday(), 
                 frequency: 'Sekali',
                 salaryPeriod: 'Awal Bulan', 
                 investType: 'Saham',
@@ -466,7 +479,6 @@
                 targetYears: 1
             });
 
-            // Helpers
             const formatInputMoney = (event) => {
                 let rawValue = event.target.value.replace(/\D/g, '');
                 if (!rawValue) {
@@ -478,7 +490,6 @@
                 displayAmount.value = new Intl.NumberFormat('id-ID').format(rawValue);
             };
 
-            // Firebase Integration
             onMounted(() => {
                 const q = collection(db, "transactions");
                 onSnapshot(q, (snapshot) => {
@@ -513,13 +524,12 @@
                         }
                     });
                     
-                    // Reset Form Logic
                     form.value.amount = null;
                     form.value.itemName = '';
                     displayAmount.value = '';
                     form.value.isRecurring = false;
                     form.value.recurringDuration = 0;
-                    form.value.date = getLocalToday(); // RESET TO TODAY DATE (FIX)
+                    form.value.date = getLocalToday(); 
                     
                     alert('Data tersimpan di Cloud!');
                 } catch (e) {
@@ -542,30 +552,41 @@
                 catch (e) { alert("Gagal update target"); }
             }
 
-            // --- DATE HELPER LOGIC FOR BREAKDOWN ---
-            const isSameDay = (d1, d2) => d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
-            const isSameMonth = (d1, d2) => d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth();
-            const isSameYear = (d1, d2) => d1.getFullYear() === d2.getFullYear();
-            
-            const isSameWeek = (date) => {
-                const today = new Date();
-                const firstDayOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + (today.getDay() === 0 ? -6 : 1))); 
-                const lastDayOfWeek = new Date(firstDayOfWeek);
-                lastDayOfWeek.setDate(lastDayOfWeek.getDate() + 6); 
-                return date >= firstDayOfWeek && date <= lastDayOfWeek;
-            };
-
+            // --- FIXED: DATE BREAKDOWN LOGIC ---
             const getBreakdown = (type) => {
-                const now = new Date();
+                const now = new Date(); 
+                now.setHours(0,0,0,0); // Normalize 'Now' to midnight
+
+                // Weekly Boundaries (Mon 00:00 to Next Mon 00:00)
+                const startOfWeek = getStartOfWeek(now);
+                const endOfWeek = new Date(startOfWeek);
+                endOfWeek.setDate(startOfWeek.getDate() + 7);
+
                 const filtered = transactions.value.filter(t => t.type === type);
                 let daily = 0, weekly = 0, monthly = 0, yearly = 0;
 
                 filtered.forEach(t => {
-                    const tDate = new Date(t.date);
-                    if (isSameDay(tDate, now)) daily += t.amount;
-                    if (isSameWeek(tDate)) weekly += t.amount;
-                    if (isSameMonth(tDate, now)) monthly += t.amount;
-                    if (isSameYear(tDate, now)) yearly += t.amount;
+                    const tDate = parseLocal(t.date); // Normalize 'Transaction' to midnight
+                    
+                    // Daily
+                    if (tDate.getTime() === now.getTime()) {
+                        daily += t.amount;
+                    }
+
+                    // Weekly (Inclusive Start, Exclusive End)
+                    if (tDate >= startOfWeek && tDate < endOfWeek) {
+                        weekly += t.amount;
+                    }
+
+                    // Monthly
+                    if (tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear()) {
+                        monthly += t.amount;
+                    }
+
+                    // Yearly
+                    if (tDate.getFullYear() === now.getFullYear()) {
+                        yearly += t.amount;
+                    }
                 });
                 return { daily, weekly, monthly, yearly };
             };
@@ -579,9 +600,9 @@
             
             const sortedTransactions = computed(() => {
                 return [...transactions.value].sort((a, b) => {
-                    const dateA = new Date(a.date);
-                    const dateB = new Date(b.date);
-                    if (dateB - dateA !== 0) return dateB - dateA;
+                    const dateA = parseLocal(a.date);
+                    const dateB = parseLocal(b.date);
+                    if (dateB.getTime() - dateA.getTime() !== 0) return dateB - dateA;
                     const timeA = a.timestamp || 0;
                     const timeB = b.timestamp || 0;
                     return timeB - timeA;
@@ -633,8 +654,16 @@
                     return `Fokus Utama: Dana darurat Anda belum aman. Kurang ${formatRupiah(emergencyFundTarget.value - currentBalance.value)} lagi untuk mencapai titik aman 6x pengeluaran.`;
                 }
 
+                // AI TIP: Check Food Expense %
+                const now = new Date();
                 const foodExpense = transactions.value
-                    .filter(t => t.type === 'expense' && t.category === 'Makan' && isSameMonth(new Date(t.date), new Date()))
+                    .filter(t => {
+                        const tDate = parseLocal(t.date);
+                        return t.type === 'expense' && 
+                               t.category === 'Makan' && 
+                               tDate.getMonth() === now.getMonth() && 
+                               tDate.getFullYear() === now.getFullYear();
+                    })
                     .reduce((acc, t) => acc + t.amount, 0);
                 
                 if (expenseBreakdown.value.monthly > 0 && (foodExpense / expenseBreakdown.value.monthly) > 0.4) {
@@ -656,7 +685,7 @@
             const formatCurrencySimple = (number) => new Intl.NumberFormat('id-ID').format(number);
             const formatDate = (dateStr) => {
                 const options = { day: 'numeric', month: 'short', year: 'numeric' };
-                return new Date(dateStr).toLocaleDateString('id-ID', options);
+                return parseLocal(dateStr).toLocaleDateString('id-ID', options);
             };
 
             return {
